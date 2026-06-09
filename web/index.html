@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Mundial 2026 — Predicción calibrada · worldcup-predict</title>
+<meta name="description" content="Predicción probabilística calibrada del Mundial 2026: ensemble de Elo + Dixon-Coles + mercado, simulación Monte Carlo de 50.000 torneos." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg: #f7f8f8;
+    --surface: #ffffff;
+    --ink: #18181b;
+    --ink-soft: #52525b;
+    --ink-faint: #a1a1aa;
+    --line: #e6e7e9;
+    --accent: #047857;        /* desaturated emerald, single accent */
+    --accent-soft: #ecfdf5;
+    --shadow: 0 20px 40px -22px rgba(15, 23, 42, 0.18);
+    --radius: 28px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "Geist", system-ui, sans-serif;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  .mono { font-family: "Geist Mono", ui-monospace, monospace; font-variant-numeric: tabular-nums; }
+  .wrap { width: 100%; max-width: 1180px; margin: 0 auto; padding: 0 24px; }
+  a { color: inherit; }
+
+  /* fade-up load choreography */
+  @keyframes up { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+  .rise { opacity: 0; animation: up 0.7s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+  @media (prefers-reduced-motion: reduce) { .rise { animation: none; opacity: 1; } }
+
+  /* top bar */
+  header.bar {
+    position: sticky; top: 0; z-index: 20;
+    background: rgba(247, 248, 248, 0.8);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--line);
+  }
+  .bar .row { display: flex; align-items: center; justify-content: space-between; height: 60px; }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 600; letter-spacing: -0.02em; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 4px var(--accent-soft); }
+  .bar nav { display: flex; gap: 26px; font-size: 14px; color: var(--ink-soft); }
+  .bar nav a { text-decoration: none; transition: color 0.2s; }
+  .bar nav a:hover { color: var(--ink); }
+  .ghost-link { font-size: 14px; padding: 8px 16px; border: 1px solid var(--line); border-radius: 999px; text-decoration: none; transition: transform 0.15s, border-color 0.2s; }
+  .ghost-link:hover { border-color: var(--accent); transform: translateY(-1px); }
+  @media (max-width: 720px) { .bar nav { display: none; } }
+
+  /* hero — asymmetric split */
+  .hero { padding: 84px 0 48px; }
+  .hero-grid { display: grid; grid-template-columns: 1.4fr 1fr; gap: 56px; align-items: center; }
+  .eyebrow { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 500; color: var(--accent); background: var(--accent-soft); padding: 6px 12px; border-radius: 999px; }
+  h1 { font-size: clamp(2.6rem, 5.4vw, 4.4rem); font-weight: 800; letter-spacing: -0.04em; line-height: 0.98; margin: 22px 0 0; }
+  h1 .b { color: var(--accent); }
+  .lead { margin-top: 22px; font-size: 1.075rem; color: var(--ink-soft); max-width: 56ch; }
+  .cta { margin-top: 30px; display: flex; gap: 12px; flex-wrap: wrap; }
+  .btn { text-decoration: none; font-size: 15px; font-weight: 500; padding: 12px 22px; border-radius: 999px; transition: transform 0.15s ease; display: inline-flex; align-items: center; gap: 8px; }
+  .btn:active { transform: scale(0.98); }
+  .btn-primary { background: var(--ink); color: #fff; }
+  .btn-primary:hover { transform: translateY(-1px); }
+  .btn-secondary { background: transparent; color: var(--ink); border: 1px solid var(--line); }
+  .btn-secondary:hover { border-color: var(--ink); transform: translateY(-1px); }
+
+  /* dual-pick card */
+  .pick {
+    background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+    box-shadow: var(--shadow); padding: 28px; display: grid; gap: 18px;
+  }
+  .pick h3 { font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink-faint); }
+  .pick-row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+  .pick-row .who { font-size: 1.5rem; font-weight: 700; letter-spacing: -0.02em; }
+  .pick-row .src { font-size: 12.5px; color: var(--ink-faint); }
+  .pick-row .pct { font-size: 1.5rem; font-weight: 700; }
+  .pick .div { height: 1px; background: var(--line); }
+  .accentpct { color: var(--accent); }
+
+  /* stats strip */
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); margin-top: 8px; }
+  .stat { padding: 26px 8px; }
+  .stat + .stat { border-left: 1px solid var(--line); }
+  .stat .n { font-size: 2rem; font-weight: 700; letter-spacing: -0.03em; }
+  .stat .k { font-size: 13px; color: var(--ink-soft); margin-top: 4px; }
+  .stat .h { font-size: 11.5px; color: var(--ink-faint); margin-top: 2px; }
+  @media (max-width: 820px) { .hero-grid { grid-template-columns: 1fr; gap: 36px; } .stats { grid-template-columns: repeat(2, 1fr); } .stat:nth-child(3) { border-left: none; } .stat:nth-child(3), .stat:nth-child(4) { border-top: 1px solid var(--line); } }
+
+  /* sections */
+  section { padding: 70px 0; }
+  .sec-head { max-width: 60ch; margin-bottom: 34px; }
+  .sec-head .kicker { font-size: 13px; font-weight: 600; color: var(--accent); letter-spacing: 0.04em; }
+  .sec-head h2 { font-size: clamp(1.8rem, 3.4vw, 2.6rem); font-weight: 700; letter-spacing: -0.03em; margin-top: 8px; }
+  .sec-head p { margin-top: 12px; color: var(--ink-soft); }
+
+  /* charts — one full-width chart per row */
+  .stack { display: grid; grid-template-columns: 1fr; gap: 32px; }
+  .figure { display: flex; flex-direction: column; gap: 12px; }
+  .frame { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); padding: 20px; overflow: hidden; transition: transform 0.25s cubic-bezier(0.16,1,0.3,1); }
+  .frame:hover { transform: translateY(-3px); }
+  .frame img { width: 100%; height: auto; display: block; border-radius: 14px; }
+  .cap { padding: 0 4px; }
+  .cap .t { font-weight: 600; letter-spacing: -0.01em; }
+  .cap .d { font-size: 13.5px; color: var(--ink-soft); margin-top: 2px; }
+
+  /* table */
+  .board { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden; }
+  .trow { display: grid; grid-template-columns: 28px 1.3fr 2fr 84px; align-items: center; gap: 14px; padding: 14px 22px; }
+  .trow + .trow { border-top: 1px solid var(--line); }
+  .thead { font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--ink-faint); }
+  .rank { color: var(--ink-faint); font-weight: 600; }
+  .team { font-weight: 600; letter-spacing: -0.01em; }
+  .bars { display: grid; gap: 6px; }
+  .barline { display: flex; align-items: center; gap: 10px; }
+  .track { flex: 1; height: 8px; background: #eef0f1; border-radius: 999px; overflow: hidden; }
+  .fill { height: 100%; border-radius: 999px; }
+  .fill.model { background: var(--ink); }
+  .fill.market { background: var(--accent); }
+  .barlbl { font-size: 11px; color: var(--ink-faint); width: 52px; }
+  .tpct { text-align: right; font-weight: 600; }
+  .legend { display: flex; gap: 18px; font-size: 13px; color: var(--ink-soft); margin-bottom: 16px; }
+  .chip { display: inline-flex; align-items: center; gap: 7px; }
+  .sw { width: 11px; height: 11px; border-radius: 3px; }
+  @media (max-width: 620px) { .trow { grid-template-columns: 22px 1fr 76px; } .bars { display: none; } }
+
+  /* method */
+  .method { display: grid; grid-template-columns: repeat(3, 1fr); gap: 22px; }
+  .mcard { padding: 4px; }
+  .mcard .step { font-family: "Geist Mono", monospace; font-size: 13px; color: var(--accent); }
+  .mcard h4 { margin-top: 10px; font-size: 1.15rem; font-weight: 700; letter-spacing: -0.02em; }
+  .mcard p { margin-top: 8px; font-size: 14.5px; color: var(--ink-soft); }
+  @media (max-width: 820px) { .method { grid-template-columns: 1fr; gap: 28px; } }
+
+  /* footer */
+  footer { border-top: 1px solid var(--line); padding: 40px 0 60px; }
+  .foot { display: flex; justify-content: space-between; gap: 20px; flex-wrap: wrap; align-items: flex-start; }
+  .disc { font-size: 12.5px; color: var(--ink-faint); max-width: 60ch; }
+  .foot a { color: var(--accent); text-decoration: none; }
+</style>
+</head>
+<body>
+
+<header class="bar">
+  <div class="wrap row">
+    <div class="brand"><span class="dot"></span> worldcup-predict</div>
+    <nav>
+      <a href="#graficos">Gráficos</a>
+      <a href="#tabla">Candidatos</a>
+      <a href="#metodo">Método</a>
+    </nav>
+    <a class="ghost-link" href="https://github.com/flareeeeeeeeee/worldcup-predict" target="_blank" rel="noopener">Código</a>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <!-- HERO -->
+  <section class="hero">
+    <div class="hero-grid">
+      <div>
+        <span class="eyebrow rise">Experimento · IA vs IA · Mundial FIFA 2026</span>
+        <h1 class="rise" style="animation-delay:.05s">El modelo dice <span class="b">Argentina</span>.<br/>El mercado dice <span class="b">España</span>.</h1>
+        <p class="lead rise" style="animation-delay:.12s">
+          Predicción probabilística del Mundial 2026 construida con un ensemble de Elo de
+          selecciones, un modelo de goles Dixon-Coles y la señal de mercado, resuelta con una
+          simulación Monte Carlo de 50.000 torneos sobre el formato real de 48 equipos.
+          No busca acertar: busca estar <strong>bien calibrada</strong>.
+        </p>
+        <div class="cta rise" style="animation-delay:.18s">
+          <a class="btn btn-primary" href="#graficos">Ver los gráficos</a>
+          <a class="btn btn-secondary" href="https://github.com/flareeeeeeeeee/worldcup-predict/blob/master/PAPER.md" target="_blank" rel="noopener">Leer el paper</a>
+        </div>
+      </div>
+
+      <aside class="pick rise" style="animation-delay:.22s">
+        <h3>Favorito al título</h3>
+        <div class="pick-row">
+          <div><div class="who">Argentina</div><div class="src">modelo puro</div></div>
+          <div class="pct mono">19.7%</div>
+        </div>
+        <div class="div"></div>
+        <div class="pick-row">
+          <div><div class="who">España</div><div class="src">mezclado con mercado</div></div>
+          <div class="pct mono accentpct">17.1%</div>
+        </div>
+        <div class="div"></div>
+        <div class="pick-row">
+          <div><div class="who" style="font-size:1.15rem">España</div><div class="src">prob. de llegar a la final</div></div>
+          <div class="pct mono" style="font-size:1.15rem">21.8%</div>
+        </div>
+      </aside>
+    </div>
+
+    <!-- STATS -->
+    <div class="stats rise" style="animation-delay:.28s">
+      <div class="stat"><div class="n mono">0.896</div><div class="k">Log-loss (holdout)</div><div class="h">azar = 1.099</div></div>
+      <div class="stat"><div class="n mono">0.525</div><div class="k">Brier (holdout)</div><div class="h">azar = 0.667</div></div>
+      <div class="stat"><div class="n mono">50.000</div><div class="k">torneos simulados</div><div class="h">Monte Carlo</div></div>
+      <div class="stat"><div class="n mono">49.378</div><div class="k">partidos de datos</div><div class="h">hasta 08-jun-2026</div></div>
+    </div>
+  </section>
+
+  <!-- GRAFICOS -->
+  <section id="graficos">
+    <div class="sec-head">
+      <div class="kicker">Visualización</div>
+      <h2>Cómo se mueve la sensación</h2>
+      <p>El gráfico principal muestra la probabilidad de campeón de cada equipo según cuánto peso
+        le des al mercado. Argentina se desploma, Francia e Inglaterra suben, España se mantiene
+        clavada — el punto de consenso entre el modelo y las casas.</p>
+    </div>
+
+    <div class="stack">
+      <div class="figure">
+        <div class="frame"><img src="charts/sensitivity_lines.png" alt="Sensibilidad de la probabilidad de campeón al peso del mercado" loading="lazy" /></div>
+        <div class="cap"><div class="t">Sensibilidad al mercado</div><div class="d">P(campeón) a 0%, 25%, 45%, 70% y 100% de peso de mercado.</div></div>
+      </div>
+      <div class="figure">
+        <div class="frame"><img src="charts/round_funnel.png" alt="Embudo del torneo por rondas" loading="lazy" /></div>
+        <div class="cap"><div class="t">Embudo del torneo</div><div class="d">Qué tan lejos llega cada favorito, ronda a ronda.</div></div>
+      </div>
+      <div class="figure">
+        <div class="frame"><img src="charts/group_heatmap.png" alt="Mapa de calor de clasificación por grupo" loading="lazy" /></div>
+        <div class="cap"><div class="t">Clasificación por grupo</div><div class="d">Probabilidad de terminar entre los dos primeros, grupo por grupo.</div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- TABLA -->
+  <section id="tabla">
+    <div class="sec-head">
+      <div class="kicker">Probabilidades</div>
+      <h2>Los doce con más opción</h2>
+      <p>Probabilidad de levantar el trofeo según el modelo puro y según la mezcla con el mercado.</p>
+    </div>
+
+    <div class="legend">
+      <span class="chip"><span class="sw" style="background:var(--ink)"></span> Modelo puro</span>
+      <span class="chip"><span class="sw" style="background:var(--accent)"></span> Mezclado con mercado</span>
+    </div>
+
+    <div class="board" id="board">
+      <div class="trow thead"><div>#</div><div>Equipo</div><div>Probabilidad de ser campeón</div><div class="tpct">Modelo</div></div>
+      <!-- rows injected -->
+    </div>
+  </section>
+
+  <!-- METODO -->
+  <section id="metodo">
+    <div class="sec-head">
+      <div class="kicker">Método</div>
+      <h2>Tres señales, un torneo simulado</h2>
+      <p>Cada pieza es independiente y medible. La calibración por backtest es la credencial:
+        convierte una opinión en una probabilidad evaluable.</p>
+    </div>
+    <div class="method">
+      <div class="mcard">
+        <div class="step">01 · ranking</div>
+        <h4>Elo de selecciones</h4>
+        <p>Rating actualizado partido a partido sobre todo el histórico internacional, con
+          ventaja de local, peso por importancia del torneo y multiplicador por goleada.</p>
+      </div>
+      <div class="mcard">
+        <div class="step">02 · goles</div>
+        <h4>Dixon-Coles</h4>
+        <p>Fuerza de ataque y defensa por equipo con decaimiento temporal — la forma de los
+          últimos seis meses pesa más — y corrección para marcadores bajos.</p>
+      </div>
+      <div class="mcard">
+        <div class="step">03 · mercado</div>
+        <h4>Cuotas de-vig</h4>
+        <p>La sabiduría colectiva de las casas, sin su margen, como ancla de realidad mezclada
+          con el modelo a nivel campeón mediante un log-opinion pool.</p>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  <div class="wrap foot">
+    <div class="disc">
+      Experimento educativo y recreativo. Las probabilidades son estimaciones de un modelo
+      estadístico y no constituyen consejo de apuestas. El fútbol es incierto; ningún modelo
+      acierta un torneo. El valor está en la metodología transparente y la calibración medible.
+    </div>
+    <div style="font-size:13px; color:var(--ink-soft)">
+      <a href="https://github.com/flareeeeeeeeee/worldcup-predict" target="_blank" rel="noopener">Código y datos en GitHub</a><br/>
+      <span class="mono" style="color:var(--ink-faint)">MIT · Juan Castillo · 2026</span>
+    </div>
+  </div>
+</footer>
+
+<script>
+  // Champion table — real model vs market-blended probabilities.
+  var TEAMS = [
+    ["Argentina", 19.7, 14.4], ["España", 16.4, 17.1], ["Francia", 5.8, 9.4],
+    ["Brasil", 5.5, 7.0], ["Portugal", 5.2, 7.1], ["Inglaterra", 5.2, 7.7],
+    ["Colombia", 4.5, 3.4], ["Japón", 4.4, 2.7], ["Noruega", 4.4, 3.5],
+    ["Ecuador", 4.2, 2.4], ["Países Bajos", 4.1, 4.4], ["Alemania", 3.9, 5.0]
+  ];
+  var MAX = 20;
+  var board = document.getElementById("board");
+  TEAMS.forEach(function (t, i) {
+    var name = t[0], model = t[1], market = t[2];
+    var row = document.createElement("div");
+    row.className = "trow rise";
+    row.style.animationDelay = (0.03 * i) + "s";
+    row.innerHTML =
+      '<div class="rank mono">' + (i + 1) + '</div>' +
+      '<div class="team">' + name + '</div>' +
+      '<div class="bars">' +
+        '<div class="barline"><div class="track"><div class="fill model" style="width:' + (100 * model / MAX) + '%"></div></div><span class="barlbl mono">' + model.toFixed(1) + '%</span></div>' +
+        '<div class="barline"><div class="track"><div class="fill market" style="width:' + (100 * market / MAX) + '%"></div></div><span class="barlbl mono">' + market.toFixed(1) + '%</span></div>' +
+      '</div>' +
+      '<div class="tpct mono">' + model.toFixed(1) + '%</div>';
+    board.appendChild(row);
+  });
+</script>
+
+</body>
+</html>

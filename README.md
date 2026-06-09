@@ -42,6 +42,20 @@ Todo se controla desde [`config.yaml`](config.yaml): pesos del ensemble, paráme
 modelos, número de simulaciones y el sorteo oficial de grupos. Por ejemplo, el peso del mercado
 en la mezcla final vive en `ensemble.champion`.
 
+## Herramientas
+
+```bash
+python reblend.py            # tabla de sensibilidad: P(campeón) a 0%/25%/45%/70%/100% de mercado
+python reblend.py 0.30       # re-mezcla puntual con 30% de peso de mercado (instantáneo, sin re-simular)
+
+python quiniela.py           # marcador predicho de los 72 partidos de grupos -> output/quiniela.csv
+                             # + clasificados por grupo -> output/quiniela_qualifiers.csv
+python score_quiniela.py     # tras llenar actual_*_goals: % de acierto de resultado y marcador exacto
+```
+
+Flujo de la quiniela: corres `quiniela.py`, llenas las columnas `actual_home_goals` /
+`actual_away_goals` conforme se juegan los partidos, y `score_quiniela.py` te da el accuracy.
+
 ## Estructura
 
 ```

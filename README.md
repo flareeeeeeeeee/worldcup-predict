@@ -22,6 +22,19 @@ Ensemble de **Elo** + **Dixon-Coles** + **señal de mercado**, resuelto con una 
 Calibración en *backtest* (n = 328): **log-loss 0.8957**, **Brier 0.5253** (vs. azar 1.099 / 0.667).
 Tabla completa de los 48 equipos: [`output/probabilities.csv`](output/probabilities.csv).
 
+## Gráficos
+
+Generados con `python charts.py` (PNG en [`output/charts/`](output/charts)).
+
+**Sensibilidad al mercado** — cómo se mueve la P(campeón) de cada equipo según cuánto le hagas
+caso al mercado. Argentina cae, Francia/Inglaterra suben, España se mantiene (consenso):
+
+![Sensibilidad al mercado](output/charts/sensitivity_lines.png)
+
+| Ranking de campeón | Embudo del torneo | Clasificación por grupo |
+|---|---|---|
+| ![bars](output/charts/champion_bars.png) | ![funnel](output/charts/round_funnel.png) | ![heatmap](output/charts/group_heatmap.png) |
+
 ## Quickstart
 
 ```bash

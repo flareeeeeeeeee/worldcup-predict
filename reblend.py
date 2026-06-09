@@ -44,15 +44,24 @@ def main():
     else:
         weights = [0.0, 0.25, 0.45, 0.70, 1.0]
         cols = {w: reblend(model_champ, market, w) for w in weights}
-        teams = sorted(model_champ, key=model_champ.get, reverse=True)[:12]
+        ordered = sorted(model_champ, key=model_champ.get, reverse=True)
+
+        # Persistir las 5 columnas de sensibilidad (una por peso de mercado) para los 48 equipos.
+        out = pd.DataFrame(
+            {f"market_{int(w*100)}": pd.Series(cols[w]) for w in weights}
+        ).reindex(ordered)
+        out.index.name = "team"
+        out.to_csv("output/market_sensitivity.csv", encoding="utf-8")
+
         header = "Equipo".ljust(22) + "".join(f"{int(w*100):>7}%" for w in weights)
         print("\nSensibilidad al peso de mercado (P de campeón):\n")
         print(header)
         print("-" * len(header))
-        for t in teams:
+        for t in ordered[:12]:
             row = t[:21].ljust(22) + "".join(f"{cols[w][t]*100:>7.1f}" for w in weights)
             print(row)
         print("\n(0% = modelo puro · 100% = solo mercado · 45% = default del pipeline)")
+        print("Guardado: output/market_sensitivity.csv (48 equipos × 5 columnas)")
 
 
 if __name__ == "__main__":

@@ -1,0 +1,46 @@
+data:
+  results_url: "https://raw.githubusercontent.com/martj42/international_results/master/results.csv"
+  football_data_token: "REPLACE_WITH_YOUR_TOKEN"
+  results_csv: "data/raw/results.csv"
+  market_csv: "data/raw/market_futures.csv"
+elo:
+  initial_rating: 1500.0
+  home_advantage: 65.0
+  k_base: 40.0
+  tournament_weights:
+    "FIFA World Cup": 2.0
+    "FIFA World Cup qualification": 1.5
+    "UEFA Nations League": 1.25
+    "UEFA Euro": 1.75
+    "Copa América": 1.75
+    "African Cup of Nations": 1.5
+    "AFC Asian Cup": 1.5
+    "Friendly": 1.0
+  default_tournament_weight: 1.0
+dixon_coles:
+  half_life_days: 365.0
+  max_goals: 10
+  recent_window_days: 1460
+ensemble:
+  match: { elo: 0.55, dc: 0.45 }
+  champion: { model: 0.55, market: 0.45 }
+  draw_param: 0.28
+simulation:
+  n_sims: 50000
+  seed: 42
+backtest:
+  holdout_days: 180
+tournament:
+  groups:
+    A: []
+    B: []
+    C: []
+    D: []
+    E: []
+    F: []
+    G: []
+    H: []
+    I: []
+    J: []
+    K: []
+    L: []
